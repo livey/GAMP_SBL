@@ -1,11 +1,7 @@
-function re_x = GAMPSBL(A,y,maxiter,tor)
-%% Inputs: 
-% A--measurement matrix 
-% y--the measurements
-% maxiter - max iterative 
-% tor -- the covergence tolerance 
-% Reference: 
-% 
+function re_x = GAMPSBL_m1(A,y,maxiter,tor)
+%%
+ % for beta=0 and noisy case: C=1e0;
+ % for beta~=0 case; C=1e6;
 %%
 beta=0;
 C=1e0;
@@ -17,36 +13,44 @@ A_t2         =  A_t.*A_t;
 Thresholding =  1.0e-6;
 time         =  0;
 % maxiter      =  200;
-% x_prior      =  (A_t*y)./diag(A_t*A);  % in high dimensional case. replaced as At*y since A_t*A is highly computing cost
+x_prior      =  (A_t*y)./diag(A_t*A);  % in high dimensional case. replaced as At*y since A_t*A is highly computing cost
 % x_prior  = inv(A'*A)*A'*y;
-sigma2     =  norm(y)^2/((1+C)*M); % optional
+% sigma2     =  norm(y)^2/((1+C)*M); % optional
 % sigma2       =  std(y)^2/C; 
-% sigma2=1e-10;
-x_prior      =  ones(N,1);         % optional
+sigma2=1e-10;
+% x_prior      =  ones(N,1);         % optional
 x_var_prior  =  ones(N,1);
 s_prior      =  zeros(M,1); 
 alpha        =  ones(N,1);
 % beta         =  1;
 a            =  1;
-b            =  1e-10;
-c=.5;
-d=0;
+% adaptive a 
+a = 1-0.2*M/N;
+
+b            =  1e-15;
 x_hat        =  zeros(N,1);
 
 % iterative process
 while time < maxiter && norm(x_prior-x_hat) > Thresholding
     time   =  time + 1;
-   for jj=1:10
     x_hat  =  x_prior;
+   for jj=1:10
+    
     % factor update part
     z      =  A*x_prior; 
     tao_p  =  A2*x_var_prior;
-    p_hat  =  z-tao_p.*s_prior;
+    p_hat  =  z-tao_p.*s_prior; 
     
     tao_z  =  (tao_p*sigma2)./(tao_p+sigma2);
     z_hat  =  tao_z.*(y./sigma2+p_hat./tao_p);
     s_prior  =  (z_hat-p_hat)./tao_p;
     tao_s  =  (1-tao_z./tao_p)./tao_p;
+       
+    % geting the limit 
+%     tao_z = 0;
+%     z_hat = y;
+%     s_prior  =  (z_hat-p_hat)./tao_p;
+%     tao_s = 1./tao_p;
     
     % variable update part
     tao_l  =  (A_t2*tao_s);   %  tao_r = 1./(A_t.*A_t*tao_s); tao_r =1./tao_l;
@@ -60,12 +64,8 @@ while time < maxiter && norm(x_prior-x_hat) > Thresholding
     x_var_prior = 1./(k_alpha+tao_l);
    end  
     % EM (parameters update)
-    sigma2 = (sum((y-z_hat).^2+tao_z)+2*d)/(M+2*c-1);
-%   sigma2=1e-10; % for noiseless case 
-    lmu=[x_prior(2:N);0]; rmu=[0;x_prior(1:N-1)];
-    lvar=[x_var_prior(2:N);0]; rvar=[0;x_var_prior(1:N-1)];
-    w=x_prior.^2+beta*lmu.^2+beta*rmu.^2+x_var_prior+beta*lvar+beta*rvar;
-    alpha = (a-.5+b)./(0.5*w+b);
+    w=x_prior.^2+x_var_prior;
+    alpha = (a-.5)./(0.5*w+b);
     index=find(alpha>1e10);  alpha(index)=1e10;
     
 end
